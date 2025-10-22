@@ -6,58 +6,67 @@ pool:
 
 variables:
   buildConfiguration: 'Release'
-  webDir: 'Tailspin.SpaceGame.Web'   # centralize the web directory
+  webDir: 'Tailspin.SpaceGame.Web'   # adjust if your web project folder differs
 
 steps:
-# Select Node LTS explicitly
+# 1) Use Node 14.x
 - task: NodeTool@0
-  displayName: 'Use Node.js 20.x'
+  displayName: 'Use Node.js 14.x'
   inputs:
-    versionSpec: '20.x'
+    versionSpec: '14.x'
 
-# Use .NET SDK 6
+# 2) Force npm 6 to match legacy toolchains (e.g., node-sass)
+- script: |
+    node -v
+    npm -v
+    npm install -g npm@6
+    npm -v
+  displayName: 'Pin npm to v6'
+
+# 3) Use .NET SDK 6.x
 - task: UseDotNet@2
   displayName: 'Use .NET SDK 6.x'
   inputs:
-    packageType: 'sdk'
+    packageType: sdk
     version: '6.x'
 
-# Install npm dependencies in the web project
+# 4) Install npm dependencies in your web directory
+#    (Npm@1 will use the Node/npm set by NodeTool@0 above)
 - task: Npm@1
-  displayName: 'npm ci (web)'
+  displayName: 'npm install (web)'
   inputs:
-    command: 'ci'
+    command: 'install'
     workingDir: '$(webDir)'
     verbose: false
 
-# Compile Sass using Dart Sass (no native bindings)
+# 5) Compile Sass using node-sass (legacy)
+#    Make sure node-sass is a dependency in $(webDir)/package.json
 - script: |
-    npm run build:sass
+    ./node_modules/.bin/node-sass wwwroot --output wwwroot
   displayName: 'Compile Sass assets'
   workingDirectory: '$(webDir)'
 
-# Run gulp tasks (ensure gulpfile.js exists in working dir)
+# 6) Run gulp tasks (ensure gulpfile.js is in the same folder)
 - task: Gulp@1
   displayName: 'Run gulp tasks'
   inputs:
     gulpFile: '$(webDir)/gulpfile.js'
-    # targets: 'default'     # optionally specify a task name
-    # arguments: '--production'
+    # targets: 'default'   # optionally specify a task
 
-# Write build info
+# 7) Write build info
 - script: |
     echo "$(Build.DefinitionName), $(Build.BuildId), $(Build.BuildNumber)" > buildinfo.txt
   displayName: 'Write build info'
   workingDirectory: '$(webDir)/wwwroot'
 
-# Restore .NET deps
+# 8) Restore .NET deps
 - task: DotNetCoreCLI@2
   displayName: 'Restore project dependencies'
   inputs:
     command: 'restore'
     projects: '**/*.csproj'
 
-# Build .NET
+# 9) Build .NET
 - task: DotNetCoreCLI@2
   displayName: 'Build the project - Release'
   inputs:
