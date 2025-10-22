@@ -6,38 +6,61 @@ pool:
 
 variables:
   buildConfiguration: 'Release'
+  webDir: 'Tailspin.SpaceGame.Web'   # centralize the web directory
 
 steps:
+# Select Node LTS explicitly
+- task: NodeTool@0
+  displayName: 'Use Node.js 20.x'
+  inputs:
+    versionSpec: '20.x'
+
+# Use .NET SDK 6
 - task: UseDotNet@2
   displayName: 'Use .NET SDK 6.x'
   inputs:
-    packageType: sdk
+    packageType: 'sdk'
     version: '6.x'
 
+# Install npm dependencies in the web project
 - task: Npm@1
-  displayName: 'Run npm install'
+  displayName: 'npm ci (web)'
   inputs:
+    command: 'ci'
+    workingDir: '$(webDir)'
     verbose: false
 
-- script: './node_modules/.bin/node-sass Tailspin.SpaceGame.Web/wwwroot --output Tailspin.SpaceGame.Web/wwwroot'
+# Compile Sass using Dart Sass (no native bindings)
+- script: |
+    npm run build:sass
   displayName: 'Compile Sass assets'
+  workingDirectory: '$(webDir)'
 
-- task: gulp@1
+# Run gulp tasks (ensure gulpfile.js exists in working dir)
+- task: Gulp@1
   displayName: 'Run gulp tasks'
+  inputs:
+    gulpFile: '$(webDir)/gulpfile.js'
+    # targets: 'default'     # optionally specify a task name
+    # arguments: '--production'
 
-- script: 'echo "$(Build.DefinitionName), $(Build.BuildId), $(Build.BuildNumber)" > buildinfo.txt'
+# Write build info
+- script: |
+    echo "$(Build.DefinitionName), $(Build.BuildId), $(Build.BuildNumber)" > buildinfo.txt
   displayName: 'Write build info'
-  workingDirectory: Tailspin.SpaceGame.Web/wwwroot
+  workingDirectory: '$(webDir)/wwwroot'
 
+# Restore .NET deps
 - task: DotNetCoreCLI@2
   displayName: 'Restore project dependencies'
   inputs:
     command: 'restore'
     projects: '**/*.csproj'
 
+# Build .NET
 - task: DotNetCoreCLI@2
   displayName: 'Build the project - Release'
   inputs:
     command: 'build'
-    arguments: '--no-restore --configuration Release'
+    arguments: '--no-restore --configuration $(buildConfiguration)'
     projects: '**/*.csproj'
