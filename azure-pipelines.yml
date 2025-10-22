@@ -6,16 +6,15 @@ pool:
 
 variables:
   buildConfiguration: 'Release'
-  webDir: 'Tailspin.SpaceGame.Web'   # adjust if your web project folder differs
 
 steps:
-# 1) Use Node 14.x
+# Use Node.js 14.x
 - task: NodeTool@0
   displayName: 'Use Node.js 14.x'
   inputs:
     versionSpec: '14.x'
 
-# 2) Force npm 6 to match legacy toolchains (e.g., node-sass)
+# Force npm to v6 (compatible with Node 14 and legacy toolchains)
 - script: |
     node -v
     npm -v
@@ -23,53 +22,36 @@ steps:
     npm -v
   displayName: 'Pin npm to v6'
 
-# 3) Use .NET SDK 6.x
 - task: UseDotNet@2
   displayName: 'Use .NET SDK 6.x'
   inputs:
     packageType: sdk
     version: '6.x'
 
-# 4) Install npm dependencies in your web directory
-#    (Npm@1 will use the Node/npm set by NodeTool@0 above)
 - task: Npm@1
-  displayName: 'npm install (web)'
+  displayName: 'Run npm install'
   inputs:
-    command: 'install'
-    workingDir: '$(webDir)'
     verbose: false
 
-# 5) Compile Sass using node-sass (legacy)
-#    Make sure node-sass is a dependency in $(webDir)/package.json
-- script: |
-    ./node_modules/.bin/node-sass wwwroot --output wwwroot
+- script: './node_modules/.bin/node-sass Tailspin.SpaceGame.Web/wwwroot --output Tailspin.SpaceGame.Web/wwwroot'
   displayName: 'Compile Sass assets'
-  workingDirectory: '$(webDir)'
 
-# 6) Run gulp tasks (ensure gulpfile.js is in the same folder)
-- task: Gulp@1
+- task: gulp@1
   displayName: 'Run gulp tasks'
-  inputs:
-    gulpFile: '$(webDir)/gulpfile.js'
-    # targets: 'default'   # optionally specify a task
 
-# 7) Write build info
-- script: |
-    echo "$(Build.DefinitionName), $(Build.BuildId), $(Build.BuildNumber)" > buildinfo.txt
+- script: 'echo "$(Build.DefinitionName), $(Build.BuildId), $(Build.BuildNumber)" > buildinfo.txt'
   displayName: 'Write build info'
-  workingDirectory: '$(webDir)/wwwroot'
+  workingDirectory: Tailspin.SpaceGame.Web/wwwroot
 
-# 8) Restore .NET deps
 - task: DotNetCoreCLI@2
   displayName: 'Restore project dependencies'
   inputs:
     command: 'restore'
     projects: '**/*.csproj'
 
-# 9) Build .NET
 - task: DotNetCoreCLI@2
   displayName: 'Build the project - Release'
   inputs:
     command: 'build'
-    arguments: '--no-restore --configuration $(buildConfiguration)'
+    arguments: '--no-restore --configuration Release'
     projects: '**/*.csproj'
