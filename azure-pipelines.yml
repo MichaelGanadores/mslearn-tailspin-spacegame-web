@@ -2,53 +2,64 @@ trigger:
 - '*'
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: 'ubuntu-22.04'
 
 variables:
   buildConfiguration: 'Release'
 
 steps:
-# Use Node.js 14.x
+# Install Node.js 14
 - task: NodeTool@0
-  displayName: 'Use Node.js 14.x'
+  displayName: 'Install Node.js 14.x'
   inputs:
     versionSpec: '14.x'
-
-# Force npm to v6 (compatible with Node 14 and legacy toolchains)
+    checkLatest: true
+# Downgrade npm to v6
 - script: |
     node -v
     npm -v
     npm install -g npm@6
     npm -v
-  displayName: 'Pin npm to v6'
+  displayName: 'Downgrade NPM to v6'
 
+# Use .NET SDK 8.x
 - task: UseDotNet@2
-  displayName: 'Use .NET SDK 6.x'
+  displayName: 'Use .NET SDK 8.x'
   inputs:
     packageType: sdk
-    version: '6.x'
+    version: '8.x'
 
+# Run npm install (at repo root; set workingDir if needed)
 - task: Npm@1
   displayName: 'Run npm install'
   inputs:
+    command: 'install'
+    # workingDir: 'Tailspin.SpaceGame.Web'   # uncomment if package.json is there
     verbose: false
 
+# Compile Sass assets with node-sass
 - script: './node_modules/.bin/node-sass Tailspin.SpaceGame.Web/wwwroot --output Tailspin.SpaceGame.Web/wwwroot'
   displayName: 'Compile Sass assets'
 
-- task: gulp@1
+# Run gulp tasks
+- task: Gulp@1
   displayName: 'Run gulp tasks'
+  # inputs:
+  #   gulpFile: 'Tailspin.SpaceGame.Web/gulpfile.js'  # set if gulpfile is not at root
 
+# Write build info
 - script: 'echo "$(Build.DefinitionName), $(Build.BuildId), $(Build.BuildNumber)" > buildinfo.txt'
   displayName: 'Write build info'
   workingDirectory: Tailspin.SpaceGame.Web/wwwroot
 
+# Restore project dependencies
 - task: DotNetCoreCLI@2
   displayName: 'Restore project dependencies'
   inputs:
     command: 'restore'
     projects: '**/*.csproj'
 
+# Build the project - Release
 - task: DotNetCoreCLI@2
   displayName: 'Build the project - Release'
   inputs:
